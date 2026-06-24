@@ -9,40 +9,47 @@ interface JourneyRailProps {
 }
 
 /**
- * Returns the active step based on scroll position.
- * Sections must have id attributes matching JOURNEY_STEPS[i].id
+ * If a page passes an explicit activeStepId, use it.
+ * Otherwise, track scroll through the #journey section and
+ * light up each dot proportionally as the user scrolls through it.
  */
 function useScrollActiveStep(externalActiveStepId?: string) {
-  const [activeStepId, setActiveStepId] = useState(
-    externalActiveStepId ?? JOURNEY_STEPS[0].id
-  )
+  const [activeStepId, setActiveStepId] = useState(JOURNEY_STEPS[0].id)
 
   useEffect(() => {
-    // If a page hard-codes an active step, respect it and skip scroll tracking
     if (externalActiveStepId) {
       setActiveStepId(externalActiveStepId)
       return
     }
 
-    const stepIds = JOURNEY_STEPS.map((s) => s.id)
-
     function onScroll() {
-      const scrollMid = window.scrollY + window.innerHeight / 2
-
-      // Walk sections from bottom to top; first one whose top is above
-      // the midpoint wins
-      let current = stepIds[0]
-      for (const id of stepIds) {
-        const el = document.getElementById(id)
-        if (el && el.getBoundingClientRect().top + window.scrollY <= scrollMid) {
-          current = id
-        }
+      const section = document.getElementById("journey")
+      if (!section) {
+        // No journey section on this page — default to first step
+        setActiveStepId(JOURNEY_STEPS[0].id)
+        return
       }
-      setActiveStepId(current)
+
+      const { top, height } = section.getBoundingClientRect()
+      const windowH = window.innerHeight
+
+      // progress: 0 when section top hits bottom of viewport,
+      //           1 when section bottom hits top of viewport
+      const progress = Math.min(
+        1,
+        Math.max(0, (windowH - top) / (height + windowH))
+      )
+
+      // Map progress to a step index
+      const index = Math.min(
+        JOURNEY_STEPS.length - 1,
+        Math.floor(progress * JOURNEY_STEPS.length)
+      )
+      setActiveStepId(JOURNEY_STEPS[index].id)
     }
 
     window.addEventListener("scroll", onScroll, { passive: true })
-    onScroll() // run once on mount
+    onScroll()
     return () => window.removeEventListener("scroll", onScroll)
   }, [externalActiveStepId])
 
@@ -51,6 +58,7 @@ function useScrollActiveStep(externalActiveStepId?: string) {
 
 export function JourneyRail({ activeStepId: externalActiveStepId, className }: JourneyRailProps) {
   const activeStepId = useScrollActiveStep(externalActiveStepId)
+  const activeIndex = JOURNEY_STEPS.findIndex((s) => s.id === activeStepId)
 
   return (
     <nav
@@ -62,7 +70,9 @@ export function JourneyRail({ activeStepId: externalActiveStepId, className }: J
     >
       {JOURNEY_STEPS.map((step, i) => {
         const isActive = step.id === activeStepId
+        const isPast = i < activeIndex
         const colors = COLOR_MAP[step.color]
+
         return (
           <div key={step.id} className="flex flex-col items-center">
             <motion.div
@@ -70,6 +80,8 @@ export function JourneyRail({ activeStepId: externalActiveStepId, className }: J
                 "group relative flex h-3 w-3 items-center justify-center rounded-full border-2 transition-all duration-300",
                 isActive
                   ? cn(colors.bg, "h-4 w-4 border-transparent")
+                  : isPast
+                  ? cn(colors.bg, "border-transparent opacity-60")
                   : "border-navy-200 bg-cream"
               )}
               animate={isActive ? { scale: [1, 1.25, 1] } : { scale: 1 }}
@@ -85,17 +97,13 @@ export function JourneyRail({ activeStepId: externalActiveStepId, className }: J
               </span>
             </motion.div>
 
-            {/* Connector line — fills with color as steps are passed */}
+            {/* Connector line fills downward as steps are passed */}
             {i < JOURNEY_STEPS.length - 1 && (
               <div className="relative h-10 w-px bg-navy-200">
                 <motion.div
                   className={cn("absolute inset-x-0 top-0 w-px", colors.bg)}
                   initial={{ height: "0%" }}
-                  animate={{
-                    height: JOURNEY_STEPS.findIndex((s) => s.id === activeStepId) > i
-                      ? "100%"
-                      : "0%",
-                  }}
+                  animate={{ height: isPast || isActive ? "100%" : "0%" }}
                   transition={{ duration: 0.4 }}
                 />
               </div>
