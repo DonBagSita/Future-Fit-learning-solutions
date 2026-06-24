@@ -148,7 +148,7 @@ export function StartPage() {
           transition={{ delay: 0.6 }}
           className="mt-5 rounded-2xl bg-amber-50 p-4 text-center text-sm text-amber-800"
         >
-          The full guided conversation, powered by Claude AI, connects here in the
+          The full guided conversation, powered by an LLM, connects here in the
           next build phase. For now you're previewing the look and feel of Future Fit.
         </motion.div>
       </motion.div>
