@@ -132,7 +132,7 @@ function parseAIResponse(raw: string): AIResponse {
       recommendedNextStep: parsed.recommendedNextStep || null,
     }
   } catch {
-    // JSON parse failed — return as plain message
+    // JSON parse failed — return as plain messag
     return {
       message: raw.trim(),
       quickReplies: null,
