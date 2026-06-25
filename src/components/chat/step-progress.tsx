@@ -8,7 +8,7 @@ interface StepProgressProps {
   currentStep: AssessmentStep
   className?: string
 }
-
+//reload
 export function StepProgress({ currentStep, className }: StepProgressProps) {
   const currentIndex = ASSESSMENT_STEPS.indexOf(currentStep)
 
