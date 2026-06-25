@@ -36,28 +36,42 @@ export async function sendMessage(
 ): Promise<AIResponse> {
   const systemPrompt = buildSystemPrompt(step, learnerName, profile)
 
-  // Build the messages array for the API call
+  // Build the messages array for the API call.
+  // Anthropic's API requires the array to start with a "user" message —
+  // defensively drop any leading assistant messages if history is malformed.
+  const history = [...conversationHistory]
+  while (history.length && history[0].role !== "user") {
+    history.shift()
+  }
+
   const messages = [
-    // Include conversation history
-    ...conversationHistory.map((msg) => ({
+    ...history.map((msg) => ({
       role: msg.role as "user" | "assistant",
-      content:
-        msg.role === "assistant"
-          ? // Strip the structured JSON wrapper from assistant messages
-            // so Claude sees natural text in history, not raw JSON
-            msg.content
-          : msg.content,
+      content: msg.content,
     })),
     // Add the new user message
     { role: "user" as const, content: userMessage },
   ]
+
+  // Defensively merge any consecutive same-role messages —
+  // Anthropic's API rejects messages arrays with back-to-back
+  // same-role turns.
+  const mergedMessages = messages.reduce<typeof messages>((acc, msg) => {
+    const last = acc[acc.length - 1]
+    if (last && last.role === msg.role) {
+      last.content = `${last.content}\n\n${msg.content}`
+    } else {
+      acc.push({ ...msg })
+    }
+    return acc
+  }, [])
 
   const response = await fetch(API_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       system: systemPrompt,
-      messages,
+      messages: mergedMessages,
       model: "claude-sonnet-4-6",
       max_tokens: 1024,
     }),
@@ -132,7 +146,7 @@ function parseAIResponse(raw: string): AIResponse {
       recommendedNextStep: parsed.recommendedNextStep || null,
     }
   } catch {
-    // JSON parse failed — return as plain messag
+    // JSON parse failed — return as plain message
     return {
       message: raw.trim(),
       quickReplies: null,
