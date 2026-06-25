@@ -16,7 +16,7 @@ interface AssessmentContextValue extends AssessmentState {
   result: AssessmentResult | null
 }
 
-const AssessmentContext = React.createContext<
+const AssessmentContext = React.createContext
   AssessmentContextValue | undefined
 >(undefined)
 
@@ -41,19 +41,6 @@ export function AssessmentProvider({
 }) {
   const [state, setState] = React.useState<AssessmentState>(INITIAL_STATE)
 
-  const addMessage = React.useCallback(
-    (msg: Omit<ChatMessage, "id" | "timestamp">) => {
-      const fullMsg: ChatMessage = {
-        ...msg,
-        id: makeId(),
-        timestamp: Date.now(),
-      }
-      setState((s) => ({ ...s, messages: [...s.messages, fullMsg] }))
-      return fullMsg
-    },
-    []
-  )
-
   const startAssessment = React.useCallback(
     async (name: string) => {
       setState(() => ({
@@ -64,8 +51,10 @@ export function AssessmentProvider({
       }))
 
       try {
+        const openingMessage = `My name is ${name}. I'm a Grade 9 learner in Kenya and I'm trying to figure out my path to Grade 10.`
+
         const response = await sendMessage(
-          `My name is ${name}. I'm a Grade 9 learner in Kenya and I'm trying to figure out my path to Grade 10.`,
+          openingMessage,
           [],
           "know-yourself",
           name,
@@ -76,6 +65,12 @@ export function AssessmentProvider({
           ...s,
           isLoading: false,
           messages: [
+            {
+              id: makeId(),
+              role: "user",
+              content: openingMessage,
+              timestamp: Date.now(),
+            },
             {
               id: makeId(),
               role: "assistant",
@@ -101,21 +96,23 @@ export function AssessmentProvider({
 
   const sendUserMessage = React.useCallback(
     async (text: string) => {
-      // Add user message immediately
-      addMessage({ role: "user", content: text })
+      const userMsg: ChatMessage = {
+        id: makeId(),
+        role: "user",
+        content: text,
+        timestamp: Date.now(),
+      }
 
-      setState((s) => ({ ...s, isLoading: true, error: null }))
+      // Show the user's message immediately, before the API call resolves
+      setState((s) => ({
+        ...s,
+        messages: [...s.messages, userMsg],
+        isLoading: true,
+        error: null,
+      }))
 
       try {
-        const currentMessages = [
-          ...state.messages,
-          {
-            id: makeId(),
-            role: "user" as const,
-            content: text,
-            timestamp: Date.now(),
-          },
-        ]
+        const currentMessages = [...state.messages, userMsg]
 
         const response = await sendMessage(
           text,
@@ -183,7 +180,7 @@ export function AssessmentProvider({
         }))
       }
     },
-    [state.messages, state.currentStep, state.learnerName, state.profile, state.result, addMessage]
+    [state.messages, state.currentStep, state.learnerName, state.profile, state.result]
   )
 
   const goToStep = React.useCallback((step: AssessmentStep) => {
